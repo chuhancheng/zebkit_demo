@@ -1,64 +1,21 @@
+import { Connector, Direction } from './lib/types';
+import {StageManager, getConnectorLinePath, hasIntersection} from './lib/util';
+
+import { AmazingLine } from './lib/shapes/AmazingLine';
+import { Container } from 'konva/lib/Container';
 import Konva from 'konva';
-import { Shape } from 'konva/lib/Shape';
+import { Layer } from 'konva/lib/Layer';
+import { Node } from 'konva/lib/Node';
 import { Stage } from 'konva/lib/Stage';
-import StageManager from './lib/util';
 import { Vector2d } from 'konva/lib/types';
 
-interface RectConnectablePoints {
-    top: Vector2d,
-    left: Vector2d,
-    right: Vector2d,
-    bottom: Vector2d
-}
+const stage = StageManager.createStage(window.innerWidth - 20, window.innerHeight - 20);
+const connectors: Connector[] = [];
 
-function getShapeConnectablePoint(obj: Shape): RectConnectablePoints {
-    const top = {
-        x: obj.getClientRect().x + obj.getClientRect().width / 2,
-        y: obj.getClientRect().y
-    }
-    const left = {
-        x: obj.getClientRect().x,
-        y: obj.getClientRect().y + obj.getClientRect().height / 2,
-    }
-    const right = {
-        x: obj.getClientRect().x + obj.getClientRect().width,
-        y: obj.getClientRect().y + obj.getClientRect().height / 2,
-    }
-    const bottom = {
-        x: obj.getClientRect().x + obj.getClientRect().width / 2,
-        y: obj.getClientRect().y + obj.getClientRect().height,
-    }
-    return {
-        top,
-        left,
-        right,
-        bottom
-    };
-}
-
-function getConnectorLinePath(obj1: Shape, obj2: Shape): number[] {
-    const obj1ContectablePoint = getShapeConnectablePoint(obj1);
-    const obj2ContectablePoint = getShapeConnectablePoint(obj2);
-    console.log('obj1ContectablePoint:', obj1ContectablePoint);
-    console.log('obj2ContectablePoint:', obj2ContectablePoint);
-
-    return [];
-}
 
 function generateContent(stage: Stage): void {
     const layer = new Konva.Layer();
-
-    const line = new Konva.Line({
-        // points: [70, 70, 140, 23, 250, 60, 300, 20],
-        points: [10, 10, 30, 30, 30, 70, 70, 70],
-        // tension: 0,
-        // visible: false,
-        // bezier: true,
-        stroke: 'red',
-        strokeWidth: 4,
-        // lineCap: 'round',
-        // lineJoin: 'round',
-    })
+    const lineGroup = new Konva.Group();
 
     const rect1 = new Konva.Rect({
         x: 30,
@@ -77,22 +34,106 @@ function generateContent(stage: Stage): void {
         draggable: true
     });
 
-    // rect1.on('dragstart', function () {
-    //     console.log('dragstart');
-    // });
-    rect1.on('dragmove', function () {
-        // line.visible(true);
-        const path = getConnectorLinePath(rect1, rect2);
-        line.points(path);
-        console.log('dragmove');
+    const rect3 = new Konva.Rect({
+        x: 230,
+        y: 130,
+        width: 50,
+        height: 50,
+        fill: 'red',
+        draggable: true
     });
-    // rect1.on('dragend', function () {
-    //     console.log('dragend');
-    // });
+
+    connectors.push(new Connector({
+        from: { target: rect1, direction: Direction.TOP },
+        to: { target: rect2, direction: Direction.TOP }
+    }))
+    connectors.push(new Connector({
+        from: { target: rect1, direction: Direction.TOP },
+        to: { target: rect3, direction: Direction.TOP }
+    }))
+    connectors.push(new Connector({
+        from: { target: rect2, direction: Direction.TOP },
+        to: { target: rect3, direction: Direction.LEFT }
+    }))
+
+    connectors.forEach(item => {
+        lineGroup.add(item.line);
+    });
+
+    layer.on('dragmove', function (e) {
+        updateConnector(layer);
+    });
     layer.add(rect1);
     layer.add(rect2);
-    layer.add(line);
+    layer.add(rect3);
+    layer.add(lineGroup);
     stage.add(layer);
+    updateConnector(layer);
+}
+
+function getNoOverlapWithNodesPath(source: number[], nodes: Node[]): number[]{
+    const points: number[] = [...source];
+    const from: Vector2d = {
+        x: null,
+        y: null
+    }
+    const to: Vector2d = {
+        x: null,
+        y: null
+    }
+    const next: Vector2d = {
+        x: null,
+        y: null
+    }
+    for(let i=1;i<Math.floor(points.length/2)-2;i++) {
+        [from.x, from.y] = points.slice(i*2, i*2+2);
+        [to.x, to.y] = points.slice((i+1)*2, (i+1)*2+2);
+        [next.x, next.y] = points.slice((i+2)*2, (i+2)*2+2);
+        for(let j=0;j<nodes.length;j++) {
+            const target = nodes[j];
+            if (hasIntersection(target.getClientRect(), [from, to])) {
+                // 表示是垂直線
+                if (from.x === to.x) {
+                    // 線段的下一個點的方向來決定要推移線段的方向
+                    if (next.x && next.x < from.x) {
+                        from.x = target.getClientRect().x - 20;
+                        to.x = target.getClientRect().x - 20;
+                    } else {
+                        from.x = target.getClientRect().x + target.getClientRect().width + 20;
+                        to.x = target.getClientRect().x+ target.getClientRect().width + 20;
+                    }
+                    points[i*2] = from.x;
+                    points[(i+1)*2] = from.x;
+                }
+                // 表示是水平線
+                if (from.y === to.y) {
+                    // 線段的下一個點的方向來決定要推移線段的方向
+                    if (next.y && next.y < from.y) {
+                        from.y = target.getClientRect().y - 20;
+                        to.y = target.getClientRect().y - 20;
+                    } else {
+                        from.y = target.getClientRect().y + target.getClientRect().height + 20;
+                        to.y = target.getClientRect().y + target.getClientRect().height + 20;
+                    }
+                    points[i*2+1] = from.y;
+                    points[(i+1)*2+1] = from.y;
+                }
+            }
+        }
+    }
+    return points;
+}
+
+function updateConnector(layer: Layer): void {
+    const nodes: Node[] = layer.find('Rect');
+    connectors.forEach(item => {
+        // 初始化成四個點的線(頭, 連結點, 連結點, 尾)
+        const points = getConnectorLinePath(item);
+        item.line.attrs.points = points;
+        item.line.optimizePath();
+        const noOverlapPath = getNoOverlapWithNodesPath(item.line.attrs.points, nodes);
+        item.line.attrs.points = noOverlapPath;
+    });
 }
 
 function generateBackground(stage: Stage): void {
@@ -112,7 +153,6 @@ function generateBackground(stage: Stage): void {
 }
 
 function bootstrap() {
-    const stage = StageManager.createStage(window.innerWidth - 20, window.innerHeight - 20);
     generateBackground(stage);
     generateContent(stage);
 }
