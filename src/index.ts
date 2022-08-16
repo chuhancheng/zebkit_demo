@@ -27,7 +27,7 @@ function generateContent(stage: Stage): void {
     });
     const rect2 = new Konva.Rect({
         x: 230,
-        y: 30,
+        y: 230,
         width: 50,
         height: 50,
         fill: 'black',
@@ -35,7 +35,7 @@ function generateContent(stage: Stage): void {
     });
 
     const rect3 = new Konva.Rect({
-        x: 230,
+        x: 180,
         y: 130,
         width: 50,
         height: 50,
@@ -53,7 +53,7 @@ function generateContent(stage: Stage): void {
     }))
     connectors.push(new Connector({
         from: { target: rect2, direction: Direction.TOP },
-        to: { target: rect3, direction: Direction.LEFT }
+        to: { target: rect3, direction: Direction.BOTTOM }
     }))
 
     connectors.forEach(item => {
